@@ -69,6 +69,9 @@ def process_message(message):
 # Event triggered when the bot is ready
 @bot.event
 async def on_ready():
+    if bot.auto_sync_commands:
+        logger.info('Syncing commands with Discord...')
+        await bot.sync_commands()
     logger.info(f'on_ready - logged in as {bot.user.name} bot.')
 
 
