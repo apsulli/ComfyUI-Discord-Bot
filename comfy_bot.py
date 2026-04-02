@@ -70,8 +70,8 @@ def process_message(message):
 @bot.event
 async def on_ready():
     if bot.auto_sync_commands:
-        logger.info('Syncing commands with Discord...')
-        await bot.sync_commands()
+        logger.info('Syncing commands with Discord (Guild: 1470592698238107821)...')
+        await bot.sync_commands(guild_ids=[1470592698238107821])
     logger.info(f'on_ready - logged in as {bot.user.name} bot.')
 
 
