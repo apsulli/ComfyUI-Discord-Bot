@@ -52,55 +52,64 @@ class ComfyClient(object):
             "comfy client created with client id [{}] and comfy server at [{}].".format(self._client_id, self._comfy_url))
 
     def _connect_websocket(self):
-        try:
-            self._websocket = websocket.WebSocket()
-            self._websocket.connect(
-                "{}://{}/ws?clientId={}".format(self._socket_protocol, self._comfy_url, self._client_id))
-        except Exception as e:
-            self._logger.error(f"Failed to connect to ComfyUI WebSocket: {e}")
-            return
+        while True:
+            try:
+                self._logger.info(f"Attempting to connect to ComfyUI WebSocket at {self._comfy_url}...")
+                self._websocket = websocket.WebSocket()
+                self._websocket.connect(
+                    "{}://{}/ws?clientId={}".format(self._socket_protocol, self._comfy_url, self._client_id))
+                self._logger.info("Successfully connected to ComfyUI WebSocket.")
+            except Exception as e:
+                self._logger.error(f"Failed to connect to ComfyUI WebSocket: {e}. Retrying in 10s...")
+                import time
+                time.sleep(10)
+                continue
 
-        output_images = {}
-        current_node = ""
-        try:
-            while True:
-                try:
-                    out = self._websocket.recv()
-                except Exception as e:
-                    self._logger.error(f"WebSocket receive error: {e}")
-                    break
-                if out is None:
-                    break
-                if isinstance(out, str):
-                    message = json.loads(out)
-                    if message['type'] == 'executing':
-                        self._logger.debug(f"message from server: {message}")
-                        data = message['data']
-                        if len(self._prompt_ids) > 0 and data['prompt_id'] == self._prompt_ids[0]:
-                            if data['node'] is None:
-                                self._callbacks[0](
-                                    QueuePromptResult(prompt_id=self._prompt_ids[0], images=output_images, status=True))
-                                self._prompt_ids = self._prompt_ids[1:]
-                                self._callbacks = self._callbacks[1:]
-                                output_images = {}
-                                current_node = ""
-                                pass
-                            else:
-                                current_node = data['node']
-                else:
-                    if current_node == 'save_image_websocket_node':
-                        images_output = output_images.get(current_node, [])
-                        images_output.append(out[8:])
-                        output_images[current_node] = images_output
-        finally:
-            if self._websocket:
-                self._websocket.close()
+            output_images = {}
+            current_node = ""
+            try:
+                while True:
+                    try:
+                        out = self._websocket.recv()
+                    except Exception as e:
+                        self._logger.error(f"WebSocket connection lost: {e}")
+                        break
+                    
+                    if out is None:
+                        break
+                    
+                    if isinstance(out, str):
+                        message = json.loads(out)
+                        if message['type'] == 'executing':
+                            data = message['data']
+                            if len(self._prompt_ids) > 0 and data['prompt_id'] == self._prompt_ids[0]:
+                                if data['node'] is None:
+                                    self._logger.info(f"Prompt {self._prompt_ids[0]} execution completed.")
+                                    self._callbacks[0](
+                                        QueuePromptResult(prompt_id=self._prompt_ids[0], images=output_images, status=True))
+                                    self._prompt_ids = self._prompt_ids[1:]
+                                    self._callbacks = self._callbacks[1:]
+                                    output_images = {}
+                                    current_node = ""
+                                else:
+                                    current_node = data['node']
+                                    self._logger.debug(f"Executing node: {current_node}")
+                    else:
+                        if current_node == 'save_image_websocket_node':
+                            images_output = output_images.get(current_node, [])
+                            images_output.append(out[8:])
+                            output_images[current_node] = images_output
+            finally:
+                if self._websocket:
+                    self._websocket.close()
+                self._logger.info("WebSocket closed. Reconnecting...")
+                import time
+                time.sleep(5)
 
     def queue_prompt(self, prompt, callback):
         p = {"prompt": prompt, "client_id": self._client_id}
         data = json.dumps(p).encode('utf-8')
         url = "{}://{}/prompt".format(self._protocol, self._comfy_url)
-        self._logger.debug(f"Queueing prompt to {url}")
         try:
             req = urllib.request.Request(url, data=data)
             self._callbacks.append(callback)
@@ -108,6 +117,7 @@ class ComfyClient(object):
                 res = json.loads(response.read())
                 prompt_id = res['prompt_id']
                 self._prompt_ids.append(prompt_id)
+                self._logger.info(f"Prompt queued successfully. ID: {prompt_id}")
                 return prompt_id
         except urllib.error.HTTPError as e:
             self._logger.error(f"HTTP Error {e.code}: {e.reason}")
