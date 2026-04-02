@@ -64,9 +64,9 @@ sudo systemctl start comfy-bot.service
 ## Troubleshooting
 
 ### Python 3.13: ModuleNotFoundError: No module named 'audioop'
-Python 3.13 removed the `audioop` module. To fix this, ensure you have `audioop-lpm` installed:
+Python 3.13 removed the `audioop` module. To fix this, ensure you have `audioop-lts` installed:
 ```bash
-pip install audioop-lpm
+pip install audioop-lts
 ```
 
 ### ModuleNotFoundError: No module named 'dotenv'
