@@ -8,6 +8,7 @@ import uuid
 from discord.ui import View, Button
 from dotenv import load_dotenv
 
+from wakeonlan import send_magic_packet
 from bot_db import BotDB
 from comfy_handlers_manager import ComfyHandlersManager, ComfyHandlersContext
 from comfy_client import ComfyClient, QueuePromptResult
@@ -19,6 +20,25 @@ intents = discord.Intents.default()
 intents.dm_messages = True
 bot = commands.Bot(intents=intents, command_prefix="/")
 logger = get_logger("ComfyBOT")
+
+
+async def ping_host(host):
+    try:
+        # Extract hostname/IP from host:port if necessary
+        ip = host.split(':')[0]
+        # Use -c 1 for Unix, -n 1 for Windows
+        param = '-n' if os.name == 'nt' else '-c'
+        command = ['ping', param, '1', ip]
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await process.communicate()
+        return process.returncode == 0
+    except Exception as e:
+        logger.error(f"Ping failed: {e}")
+        return False
 
 
 def process_message(message):
@@ -288,6 +308,34 @@ async def queue_status(ctx):
         ids = "{}\n{}".format(ids, data[1])
     response = "{}\n{}".format(ComfyClient().get_prompt(), ids)
     await ctx.respond(response)
+
+
+@bot.slash_command(name="wake", description="Wake the ComfyUI host PC using Wake-on-LAN")
+async def wake(ctx):
+    mac = os.getenv('COMFY_UI_MAC')
+    host = os.getenv('COMFY_UI_HOST', '127.0.0.1:8188')
+
+    if not mac:
+        await ctx.respond("❌ COMFY_UI_MAC environment variable is not set.")
+        return
+
+    await ctx.respond(f"⏳ Sending wake packet to `{mac}`. Waiting for host `{host}` to respond (timeout: 60s)...")
+    
+    try:
+        send_magic_packet(mac)
+        logger.info(f"Sent magic packet to {mac}")
+    except Exception as e:
+        await ctx.respond(f"❌ Failed to send magic packet: {e}")
+        return
+
+    start_time = asyncio.get_event_loop().time()
+    while asyncio.get_event_loop().time() - start_time < 60:
+        if await ping_host(host):
+            await ctx.respond(f"✅ Host `{host}` is now online!")
+            return
+        await asyncio.sleep(5)
+
+    await ctx.respond(f"❌ Timed out waiting for host `{host}` to respond.")
 
 
 if __name__ == '__main__':
