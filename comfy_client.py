@@ -46,13 +46,22 @@ class ComfyClient(object):
             "comfy client created with client id [{}] and comfy server at [{}].".format(self._client_id, self._comfy_url))
 
     def _connect_websocket(self):
-        self._websocket = websocket.WebSocket()
-        self._websocket.connect(
-            "{}://{}/ws?clientId={}".format(self._socket_protocol, self._comfy_url, self._client_id))
+        try:
+            self._websocket = websocket.WebSocket()
+            self._websocket.connect(
+                "{}://{}/ws?clientId={}".format(self._socket_protocol, self._comfy_url, self._client_id))
+        except Exception as e:
+            self._logger.error(f"Failed to connect to ComfyUI WebSocket: {e}")
+            return
+
         output_images = {}
         current_node = ""
         while True:
-            out = self._websocket.recv()
+            try:
+                out = self._websocket.recv()
+            except Exception as e:
+                self._logger.error(f"WebSocket receive error: {e}")
+                break
             if isinstance(out, str):
                 message = json.loads(out)
                 if message['type'] == 'executing':
