@@ -30,6 +30,7 @@ class ComfyHandlersManager(object):
         items = getattr(modul, "__all__")
 
         for item in items:
+            self._logger.debug(f"Attempting to instantiate handler: {item}")
             instance = getattr(modul, item)()
             self._handlers[instance.key()] = instance
             self._logger.info("handler '{}' added.".format(instance.key()))

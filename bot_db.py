@@ -56,10 +56,16 @@ class BotDB(object):
     def _setup(self):
         DB_PATH = "db"
         self._logger = get_logger("BOT-DB")
+        self._logger.info(f"Setting up database at path: {DB_PATH}")
         if not os.path.exists(DB_PATH):
             os.makedirs(DB_PATH)
             self._logger.info(f"Folder '{DB_PATH}' created successfully.")
-        self._engine = create_engine("sqlite:///{}/bot.db".format(DB_PATH), echo=False)
+        
+        db_file = os.path.join(DB_PATH, "bot.db")
+        self._logger.info(f"Initializing SQLite engine with file: {db_file}")
+        self._engine = create_engine(f"sqlite:///{db_file}", echo=False)
+        
+        self._logger.info("Creating all tables if they don't exist...")
         Base.metadata.create_all(self._engine)
         self._logger.info("Database setup complete.")
 
