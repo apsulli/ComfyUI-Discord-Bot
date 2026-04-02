@@ -19,6 +19,7 @@ load_dotenv()
 intents = discord.Intents.default()
 intents.dm_messages = True
 bot = commands.Bot(intents=intents, command_prefix="/")
+bot.auto_sync_commands = False
 logger = get_logger("ComfyBOT")
 
 
@@ -68,9 +69,6 @@ def process_message(message):
 # Event triggered when the bot is ready
 @bot.event
 async def on_ready():
-    if bot.auto_sync_commands:
-        logger.debug('sync commands with discord server')
-        await bot.sync_commands()
     logger.info(f'on_ready - logged in as {bot.user.name} bot.')
 
 
