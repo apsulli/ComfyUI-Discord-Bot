@@ -38,7 +38,13 @@ class ComfyClient(object):
         self._comfy_url = os.getenv('COMFY_UI_HOST', '127.0.0.1:8188')
         self._websocket = None
         self._client_id = str(uuid.uuid4())
-        self._executor = ThreadPoolExecutor(max_workers=1)
+        
+        # Start the websocket thread as a daemon so it doesn't block shutdown
+        import threading
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ComfyWS")
+        # We can't easily make ThreadPoolExecutor threads daemons in all versions, 
+        # but we can close the websocket on shutdown.
+        
         self._executor.submit(self._connect_websocket)
         self._callbacks = []
         self._prompt_ids = []
@@ -56,42 +62,64 @@ class ComfyClient(object):
 
         output_images = {}
         current_node = ""
-        while True:
-            try:
-                out = self._websocket.recv()
-            except Exception as e:
-                self._logger.error(f"WebSocket receive error: {e}")
-                break
-            if isinstance(out, str):
-                message = json.loads(out)
-                if message['type'] == 'executing':
-                    self._logger.debug(f"message from server: {message}")
-                    data = message['data']
-                    if len(self._prompt_ids) > 0 and data['prompt_id'] == self._prompt_ids[0]:
-                        if data['node'] is None:
-                            self._callbacks[0](
-                                QueuePromptResult(prompt_id=self._prompt_ids[0], images=output_images, status=True))
-                            self._prompt_ids = self._prompt_ids[1:]
-                            self._callbacks = self._callbacks[1:]
-                            output_images = {}
-                            current_node = ""
-                            pass
-                        else:
-                            current_node = data['node']
-            else:
-                if current_node == 'save_image_websocket_node':
-                    images_output = output_images.get(current_node, [])
-                    images_output.append(out[8:])
-                    output_images[current_node] = images_output
+        try:
+            while True:
+                try:
+                    out = self._websocket.recv()
+                except Exception as e:
+                    self._logger.error(f"WebSocket receive error: {e}")
+                    break
+                if out is None:
+                    break
+                if isinstance(out, str):
+                    message = json.loads(out)
+                    if message['type'] == 'executing':
+                        self._logger.debug(f"message from server: {message}")
+                        data = message['data']
+                        if len(self._prompt_ids) > 0 and data['prompt_id'] == self._prompt_ids[0]:
+                            if data['node'] is None:
+                                self._callbacks[0](
+                                    QueuePromptResult(prompt_id=self._prompt_ids[0], images=output_images, status=True))
+                                self._prompt_ids = self._prompt_ids[1:]
+                                self._callbacks = self._callbacks[1:]
+                                output_images = {}
+                                current_node = ""
+                                pass
+                            else:
+                                current_node = data['node']
+                else:
+                    if current_node == 'save_image_websocket_node':
+                        images_output = output_images.get(current_node, [])
+                        images_output.append(out[8:])
+                        output_images[current_node] = images_output
+        finally:
+            if self._websocket:
+                self._websocket.close()
 
     def queue_prompt(self, prompt, callback):
         p = {"prompt": prompt, "client_id": self._client_id}
         data = json.dumps(p).encode('utf-8')
-        req = urllib.request.Request("{}://{}/prompt".format(self._protocol, self._comfy_url), data=data)
-        self._callbacks.append(callback)
-        prompt_id = json.loads(urllib.request.urlopen(req).read())['prompt_id']
-        self._prompt_ids.append(prompt_id)
-        return prompt_id
+        url = "{}://{}/prompt".format(self._protocol, self._comfy_url)
+        self._logger.debug(f"Queueing prompt to {url}")
+        try:
+            req = urllib.request.Request(url, data=data)
+            self._callbacks.append(callback)
+            with urllib.request.urlopen(req) as response:
+                res = json.loads(response.read())
+                prompt_id = res['prompt_id']
+                self._prompt_ids.append(prompt_id)
+                return prompt_id
+        except urllib.error.HTTPError as e:
+            self._logger.error(f"HTTP Error {e.code}: {e.reason}")
+            try:
+                error_body = e.read().decode('utf-8')
+                self._logger.error(f"Response body: {error_body}")
+            except:
+                pass
+            raise
+        except Exception as e:
+            self._logger.error(f"Failed to queue prompt: {e}")
+            raise
 
     def get_image(self, filename, subfolder, folder_type):
         data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
