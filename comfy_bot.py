@@ -169,6 +169,11 @@ async def handle_prompt_queue_result(queue_prompt_result: QueuePromptResult):
 @bot.slash_command(name="q", description="Submit a prompt to current workflow handler")
 async def q(ctx: discord.commands.context.ApplicationContext, message):
     await ctx.defer()
+    host = os.getenv('COMFY_UI_HOST', '127.0.0.1:8188')
+    if not await ping_host(host):
+        await ctx.respond(f"❌ Host `{host}` is currently offline. Use `/wake` if you need to wake it.")
+        return
+
     prompt_handler = ComfyHandlersManager().get_current_handler()
     try:
         p = prompt_handler.handle(process_message(message))

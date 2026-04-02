@@ -44,6 +44,9 @@ WorkingDirectory=/home/pi/Projects/ComfyUI-Discord-Bot
 ExecStart=/home/pi/Projects/ComfyUI-Discord-Bot/venv/bin/python comfy_bot.py
 Restart=always
 RestartSec=5
+# Force kill if it doesn't stop gracefully within 5 seconds
+TimeoutStopSec=5
+KillMode=mixed
 # Optional: Load environment variables directly from a file
 # EnvironmentFile=/home/pi/Projects/ComfyUI-Discord-Bot/.env
 
