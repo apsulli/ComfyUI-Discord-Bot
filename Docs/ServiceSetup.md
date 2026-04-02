@@ -46,7 +46,14 @@ Restart=always
 RestartSec=5
 # Force kill if it doesn't stop gracefully within 5 seconds
 TimeoutStopSec=5
+KillSignal=SIGKILL
 KillMode=mixed
+
+## Nuclear Restart (Use if systemctl hangs)
+If `systemctl restart` hangs, it's because the old process is "zombieing". Run this to force a clean slate:
+```bash
+sudo killall -9 python python3 && sudo systemctl daemon-reload && sudo systemctl start comfy-bot.service
+```
 # Optional: Load environment variables directly from a file
 # EnvironmentFile=/home/pi/Projects/ComfyUI-Discord-Bot/.env
 

@@ -14,13 +14,24 @@ from comfy_handlers_manager import ComfyHandlersManager, ComfyHandlersContext
 from comfy_client import ComfyClient, QueuePromptResult
 from common import get_logger
 
+import signal
+import sys
+
 load_dotenv()
 
 intents = discord.Intents.default()
 intents.dm_messages = True
 bot = commands.Bot(intents=intents, command_prefix="/")
-bot.auto_sync_commands = False
+bot.auto_sync_commands = True
 logger = get_logger("ComfyBOT")
+
+def handle_sigterm(*args):
+    logger.info("SIGTERM received, exiting...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
+signal.signal(signal.SIGINT, handle_sigterm)
+
 
 
 async def ping_host(host):
