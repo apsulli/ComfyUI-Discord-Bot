@@ -1,4 +1,3 @@
-
 TXT_TO_IMAGE_PROMPT = """
 {
     "3": {
@@ -433,7 +432,7 @@ INSTANT_ID_BASIC = """
 }
 """
 
-INSTANT_ID_IP_ADAPTER ="""
+INSTANT_ID_IP_ADAPTER = """
 {
   "3": {
     "inputs": {
@@ -694,7 +693,7 @@ INSTANT_ID_IP_ADAPTER ="""
 }
 """
 
-IP_ADAPTER_STYLE ="""
+IP_ADAPTER_STYLE = """
 {
   "3": {
     "inputs": {
@@ -864,7 +863,301 @@ IP_ADAPTER_STYLE ="""
 }
 """
 
-FLUX_SCHNELL ="""
+LORA_CONTROLNET_PROMPT = """
+{
+  "3": {
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" },
+    "inputs": {
+      "seed": 500659386568470,
+      "steps": 35,
+      "cfg": 7,
+      "sampler_name": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 1,
+      "model": ["20", 0],
+      "positive": ["23", 0],
+      "negative": ["23", 1],
+      "latent_image": ["5", 0]
+    }
+  },
+  "4": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "Load Checkpoint" },
+    "inputs": {
+      "ckpt_name": "dreamshaper_8.safetensors"
+    }
+  },
+  "5": {
+    "class_type": "EmptyLatentImage",
+    "_meta": { "title": "Empty Latent Image" },
+    "inputs": {
+      "width": 1216,
+      "height": 320,
+      "batch_size": 1
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive)" },
+    "inputs": {
+      "text": "",
+      "clip": ["4", 1]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Negative)" },
+    "inputs": {
+      "text": "black background, dark background, night, nighttime, sky, landscape, ground, terrain, horizon, outdoor scene, monochrome, grayscale, desaturated, brown, sepia, flat color, flat shading, cel shading, vector art, clip art, coloring book, uniform line weight, SVG, simple shapes, digital art, CG, smooth plastic, uniform color, single shade of green, watercolor, wash, smoke, mist, fog, translucent, transparent, ghostly, glow, bloom, splatter, dripping ink, muddy texture, soft edges, blurry, photorealistic, 3d render, smooth gradients, character, floor, wall, text, pumpkin, fruit, flower cluster, dead tree, single tree",
+      "clip": ["4", 1]
+    }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" },
+    "inputs": {
+      "samples": ["3", 0],
+      "vae": ["26", 0]
+    }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image (RMBG)" },
+    "inputs": {
+      "filename_prefix": "rmbg",
+      "images": ["24", 0]
+    }
+  },
+  "20": {
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": { "title": "LoRA Loader (Model Only)" },
+    "inputs": {
+      "lora_name": "don_bluth_backgrounds.safetensors",
+      "strength_model": 0.3,
+      "model": ["4", 0]
+    }
+  },
+  "21": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Load Image (ControlNet)" },
+    "inputs": {
+      "image": "controlnet_block_v7 (1).png",
+      "upload": "image"
+    }
+  },
+  "22": {
+    "class_type": "ControlNetLoader",
+    "_meta": { "title": "Load ControlNet Model" },
+    "inputs": {
+      "control_net_name": "control_v11p_sd15_lineart.pth"
+    }
+  },
+  "23": {
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": { "title": "Apply ControlNet (Advanced)" },
+    "inputs": {
+      "strength": 0.9,
+      "start_percent": 0,
+      "end_percent": 0.8,
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "control_net": ["22", 0],
+      "image": ["21", 0]
+    }
+  },
+  "24": {
+    "class_type": "RMBG",
+    "_meta": { "title": "Remove Background (RMBG)" },
+    "inputs": {
+      "model": "RMBG-2.0",
+      "sensitivity": 0.4,
+      "resolution": 1024,
+      "offset_x": 3,
+      "offset_y": -3,
+      "invert": false,
+      "bg_white": true,
+      "output_format": "Alpha",
+      "bg_color": "#ffffff",
+      "image": ["8", 0]
+    }
+  },
+  "25": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image (Original)" },
+    "inputs": {
+      "filename_prefix": "original",
+      "images": ["8", 0]
+    }
+  },
+  "26": {
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE" },
+    "inputs": {
+      "vae_name": "vae-ft-mse-840000-ema-pruned.safetensors"
+    }
+  },
+  "29": {
+    "class_type": "PostImageToProject",
+    "_meta": { "title": "Post Image To Project" },
+    "inputs": {
+      "url": "http://alexs-macbook-pro.tailf7db2.ts.net:9090/upload",
+      "category": "environment",
+      "slot": "act1_parallax_near",
+      "original_image": ["8", 0],
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "rmbg_image": ["24", 0],
+      "alpha_image": ["31", 0]
+    }
+  },
+  "30": {
+    "class_type": "AILab_ColorToMask",
+    "_meta": { "title": "Color To Mask" },
+    "inputs": {
+      "invert": false,
+      "threshold": 200,
+      "color": "#ffffff",
+      "images": ["8", 0]
+    }
+  },
+  "31": {
+    "class_type": "JoinImageWithAlpha",
+    "_meta": { "title": "Join Image With Alpha" },
+    "inputs": {
+      "image": ["8", 0],
+      "alpha": ["30", 0]
+    }
+  },
+  "32": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image (ColorToMask)" },
+    "inputs": {
+      "filename_prefix": "colortomask",
+      "images": ["31", 0]
+    }
+  },
+  "save_image_websocket_node": {
+    "class_type": "SaveImageWebsocket",
+    "_meta": { "title": "SaveImageWebsocket" },
+    "inputs": {
+      "images": ["8", 0]
+    }
+  },
+  "save_image": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" },
+    "inputs": {
+      "filename_prefix": "comfy-bot-lora-controlnet-",
+      "images": ["8", 0]
+    }
+  }
+}
+"""
+
+FLUX2_DEV = """
+{
+  "1": {
+    "inputs": {
+      "unet_name": "FLUX1\\\\flux1-dev-fp8.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    },
+    "class_type": "UNETLoader",
+    "_meta": { "title": "Load Diffusion Model" }
+  },
+  "2": {
+    "inputs": {
+      "clip_name1": "t5xxl_fp8_e4m3fn.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": { "title": "DualCLIPLoader" }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "flux_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": { "title": "Load VAE" }
+  },
+  "5": {
+    "inputs": {
+      "text": "beautiful scenery",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Positive)" }
+  },
+  "6": {
+    "inputs": {
+      "guidance": 3.5,
+      "conditioning": ["5", 0]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": { "title": "FluxGuidance" }
+  },
+  "11": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "EmptySD3LatentImage" }
+  },
+  "12": {
+    "inputs": {
+      "seed": 0,
+      "steps": 20,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": ["1", 0],
+      "positive": ["6", 0],
+      "negative": ["43", 0],
+      "latent_image": ["11", 0]
+    },
+    "class_type": "KSampler",
+    "_meta": { "title": "KSampler" }
+  },
+  "13": {
+    "inputs": {
+      "samples": ["12", 0],
+      "vae": ["3", 0]
+    },
+    "class_type": "VAEDecode",
+    "_meta": { "title": "VAE Decode" }
+  },
+  "25": {
+    "inputs": {
+      "filename_prefix": "flux2-dev/discord_",
+      "images": ["13", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save Image" }
+  },
+  "43": {
+    "inputs": {
+      "text": "",
+      "clip": ["2", 0]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "CLIP Text Encode (Negative)" }
+  },
+  "save_image_websocket_node": {
+    "inputs": {
+      "images": ["13", 0]
+    },
+    "class_type": "SaveImageWebsocket",
+    "_meta": { "title": "SaveImageWebsocket" }
+  }
+}
+"""
+
+FLUX_SCHNELL = """
 {
   "5": {
     "inputs": {
