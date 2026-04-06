@@ -25,26 +25,25 @@ bot = commands.Bot(intents=intents, command_prefix="/")
 bot.auto_sync_commands = True
 logger = get_logger("ComfyBOT")
 
+
 def handle_sigterm(*args):
     logger.info("SIGTERM received, exiting...")
     sys.exit(0)
+
 
 signal.signal(signal.SIGTERM, handle_sigterm)
 signal.signal(signal.SIGINT, handle_sigterm)
 
 
-
 async def ping_host(host):
     try:
         # Extract hostname/IP from host:port if necessary
-        ip = host.split(':')[0]
+        ip = host.split(":")[0]
         # Use -c 1 for Unix, -n 1 for Windows
-        param = '-n' if os.name == 'nt' else '-c'
-        command = ['ping', param, '1', ip]
+        param = "-n" if os.name == "nt" else "-c"
+        command = ["ping", param, "1", ip]
         process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         await process.communicate()
         return process.returncode == 0
@@ -61,19 +60,29 @@ def process_message(message):
     if flags is not None:
         message = "{} {}".format(flags, message)
 
-    prefix = ComfyHandlersContext().get_prefix(ComfyHandlersManager().get_current_handler().key())
-    postfix = ComfyHandlersContext().get_postfix(ComfyHandlersManager().get_current_handler().key())
+    prefix = ComfyHandlersContext().get_prefix(
+        ComfyHandlersManager().get_current_handler().key()
+    )
+    postfix = ComfyHandlersContext().get_postfix(
+        ComfyHandlersManager().get_current_handler().key()
+    )
     if prefix is not None:
         message = "{} {}".format(prefix, message)
     if postfix is not None:
         message = "{} {}".format(message, postfix)
 
-    refs = ComfyHandlersContext().get_reference(ComfyHandlersManager().get_current_handler().key())
+    refs = ComfyHandlersContext().get_reference(
+        ComfyHandlersManager().get_current_handler().key()
+    )
     message = message + " "
     for key, value in refs.items():
         message = message.replace("{} ".format(key), "{} ".format(value))
     message = message[:-1]
-    logger.debug("processed prompt:\n------------------------\n {}\n------------------------\n".format(message))
+    logger.debug(
+        "processed prompt:\n------------------------\n {}\n------------------------\n".format(
+            message
+        )
+    )
     return message
 
 
@@ -81,9 +90,9 @@ def process_message(message):
 @bot.event
 async def on_ready():
     if bot.auto_sync_commands:
-        logger.info('Syncing commands with Discord (Guild: 1470592698238107821)...')
+        logger.info("Syncing commands with Discord (Guild: 1470592698238107821)...")
         await bot.sync_commands(guild_ids=[1470592698238107821])
-    logger.info(f'on_ready - logged in as {bot.user.name} bot.')
+    logger.info(f"on_ready - logged in as {bot.user.name} bot.")
 
 
 @bot.event
@@ -94,7 +103,10 @@ async def on_message(message):
 
     if len(message.attachments) > 0:
         for attachment in message.attachments:
-            if any(attachment.filename.lower().endswith(ext) for ext in ['.mp3', '.wav', '.ogg', '.m4a']):
+            if any(
+                attachment.filename.lower().endswith(ext)
+                for ext in [".mp3", ".wav", ".ogg", ".m4a"]
+            ):
                 try:
                     # Generate a unique filename
                     filename = f"{message.author.id}_{attachment.filename}"
@@ -106,15 +118,14 @@ async def on_message(message):
                     # await message.channel.send(f"✅ Audio file saved: {filename}")
 
                     play_view = PlayAudioView(filename)
-                    await message.channel.send(
-                        f"Selected: {filename}",
-                        view=play_view
-                    )
+                    await message.channel.send(f"Selected: {filename}", view=play_view)
 
                 except Exception as e:
-                    await message.channel.send(f"❌ Failed to save audio file: {str(e)}")
+                    await message.channel.send(
+                        f"❌ Failed to save audio file: {str(e)}"
+                    )
             ans = ""
-            if attachment.content_type.startswith('image'):
+            if attachment.content_type.startswith("image"):
                 ans = "{}\n<{}>".format(ans, attachment.url)
             if len(ans) > 0:
                 await message.channel.send(ans)
@@ -125,22 +136,29 @@ async def on_message(message):
 
 queue_prompt_results: QueuePromptResult = []
 
+
 class PlayAudioView(discord.ui.View):
     def __init__(self, filename: str):
         super().__init__()
         self.filename = filename
 
     @discord.ui.button(label="Play", style=discord.ButtonStyle.green, emoji="▶️")
-    async def play_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def play_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         # Here you would implement the logic to play the audio
         await interaction.response.send_message(f"Playing {self.filename}...")
 
     @discord.ui.button(label="Stop", style=discord.ButtonStyle.red, emoji="⏹️")
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def stop_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         await interaction.response.send_message("Stopped playback")
 
-def handle_queue_prompt_result(ctx, p, prompt_handler, res: QueuePromptResult):
+
+def handle_queue_prompt_result(ctx, p, prompt_handler, res: QueuePromptResult, channel):
     res.ctx = ctx
+    res.channel = channel
     res.prompt = p
     res.prompt_handler = prompt_handler
     queue_prompt_results.append(res)
@@ -160,77 +178,101 @@ async def handle_prompt_queue_result(queue_prompt_result: QueuePromptResult):
     # TODO add error handling
     prompt_id = queue_prompt_result.prompt_id
     logger.debug(f"handling prompt result, id:[{prompt_id}]")
-    ctx = queue_prompt_result.ctx
+    channel = queue_prompt_result.channel
     images = queue_prompt_result.images
     prompt_handler = queue_prompt_result.prompt_handler
     try:
-        # TODO handle describe more then 2000 chars...
-        await ctx.respond(
-            "Completed prompt: {}\n{}".format(prompt_id, prompt_handler.describe(queue_prompt_result.prompt)))
+        # TODO handle describe more then 2000 char...
+        await channel.send(
+            "Completed prompt: {}\n{}".format(
+                prompt_id, prompt_handler.describe(queue_prompt_result.prompt)
+            )
+        )
         logger.debug(f"handling prompt result, send prompt summary, id:[{prompt_id}]")
         for node_id, image_list in images.items():
-            imgs = [File(filename=str(uuid.uuid4()) + ".png", fp=io.BytesIO(image_data)) for image_data in image_list]
-            await ctx.respond("", files=imgs)
+            imgs = [
+                File(filename=str(uuid.uuid4()) + ".png", fp=io.BytesIO(image_data))
+                for image_data in image_list
+            ]
+            await channel.send("", files=imgs)
             logger.debug(f"handling prompt result, sent images, id:[{prompt_id}]")
-            # for img in imgs:
-            #     await ctx.respond("", files=imgs)
-            #     logger.debug(f"handling prompt result, sent image, id:[{prompt_id}]")
     except Exception as e:
         logger.error(f"failed to send results due to: {e}")
-        await ctx.respond("error while processing images")
+        if channel:
+            await channel.send("error while processing images")
 
 
 @bot.slash_command(name="q", description="Submit a prompt to current workflow handler")
 async def q(ctx: discord.commands.context.ApplicationContext, message):
     await ctx.defer()
-    host = os.getenv('COMFY_UI_HOST', '127.0.0.1:8188')
+    # Capture channel immediately for later use
+    channel = ctx.channel
+    # Send immediate followup to resolve "thinking" state
+    await ctx.respond("⏳ Queuing generation...")
+
+    host = os.getenv("COMFY_UI_HOST", "127.0.0.1:8188")
     if not await ping_host(host):
-        await ctx.respond(f"❌ Host `{host}` is currently offline. Use `/wake` if you need to wake it.")
+        await channel.send(
+            f"❌ Host `{host}` is currently offline. Use `/wake` if you need to wake it."
+        )
         return
 
     prompt_handler = ComfyHandlersManager().get_current_handler()
     try:
         p = prompt_handler.handle(process_message(message))
     except Exception as e:
-        await ctx.respond("```failed to process given message```")
+        await channel.send("```failed to process given message```")
         logger.error(e)
         return
     try:
-        ComfyClient().queue_prompt(p, lambda res: handle_queue_prompt_result(ctx, p, prompt_handler, res))
+        ComfyClient().queue_prompt(
+            p,
+            lambda res: handle_queue_prompt_result(
+                ctx, p, prompt_handler, res, channel
+            ),
+        )
     except Exception as e:
-        await ctx.respond("```failed to queue given message```")
+        await channel.send("```failed to queue given message```")
         logger.error(e)
         return
 
 
 @bot.slash_command(name="ref-set", description="Set a reference value")
 async def ref_set(ctx, ref, value):
-    if '#' in ref:
+    if "#" in ref:
         await ctx.respond("# can`t be in the given ref name!")
         return
-    if ' ' in ref:
+    if " " in ref:
         await ctx.respond("white space can`t be in the given ref name!")
         return
-    ComfyHandlersContext().set_reference(ComfyHandlersManager().get_current_handler().key(), ref, value)
+    ComfyHandlersContext().set_reference(
+        ComfyHandlersManager().get_current_handler().key(), ref, value
+    )
     await ctx.respond("Set #{}={}".format(ref, value))
 
 
 @bot.slash_command(name="ref-del", description="Remove a reference")
 async def ref_del(ctx, ref):
-    if '#' in ref:
-        await ctx.respond('# can`t be in the given ref name!')
+    if "#" in ref:
+        await ctx.respond("# can`t be in the given ref name!")
         return
-    if ' ' in ref:
+    if " " in ref:
         await ctx.respond("white space can`t be in the given ref name!")
         return
-    ComfyHandlersContext().remove_reference(ComfyHandlersManager().get_current_handler().key(), ref)
+    ComfyHandlersContext().remove_reference(
+        ComfyHandlersManager().get_current_handler().key(), ref
+    )
     await ctx.respond("Remove #{}".format(ref))
 
 
 @bot.slash_command(name="ref-view", description="View all references")
 async def ref_view(ctx):
     respond = "Current references:"
-    for key, value in ComfyHandlersContext().get_reference(ComfyHandlersManager().get_current_handler().key()).items():
+    for key, value in (
+        ComfyHandlersContext()
+        .get_reference(ComfyHandlersManager().get_current_handler().key())
+        .items()
+    ):
         respond = "{}\n{} = {}".format(respond, key, value)
     await ctx.respond(respond)
 
@@ -238,8 +280,12 @@ async def ref_view(ctx):
 async def set_handler(interaction):
     ComfyHandlersManager().set_current_handler(interaction.custom_id)
     BotDB().create_or_update_global_handler(interaction.custom_id)
-    await interaction.response.send_message("Handler [{}] selected\n\n{}".format(interaction.custom_id,
-                                                                                 ComfyHandlersManager().get_current_handler().info()))
+    await interaction.response.send_message(
+        "Handler [{}] selected\n\n{}".format(
+            interaction.custom_id, ComfyHandlersManager().get_current_handler().info()
+        )
+    )
+
 
 @bot.slash_command(name="handlers", description="List of all handlers")
 async def handlers(ctx):
@@ -257,10 +303,13 @@ async def handlers(ctx):
     await ctx.send("", view=view)
 
 
-@bot.slash_command(name="handler-info", description="Information about the current workflow handler")
+@bot.slash_command(
+    name="handler-info", description="Information about the current workflow handler"
+)
 async def handler_info(ctx):
     prompt_handler = ComfyHandlersManager().get_current_handler()
     await ctx.respond(prompt_handler.info())
+
 
 class HandlerContextModal(discord.ui.Modal):
     def __init__(self, *args, **kwargs) -> None:
@@ -289,21 +338,33 @@ async def handler_context(ctx):
     if flags is None:
         flags = ComfyHandlersManager().get_current_handler().default_flags()
 
-    modal.add_item(discord.ui.InputText(label="Prefix",
-                                        placeholder="Set message prefix, this will be appended in the beginning of the /q {message}",
-                                        required=False,
-                                        value=handler_ctx.get_prefix(current_handler_key),
-                                        style=discord.InputTextStyle.long))
-    modal.add_item(discord.ui.InputText(label="Postfix",
-                                        placeholder="Set message postfix, this will be appended in the end of the /q {message}",
-                                        required=False,
-                                        value=handler_ctx.get_postfix(current_handler_key),
-                                        style=discord.InputTextStyle.long))
-    modal.add_item(discord.ui.InputText(label="Flags",
-                                        placeholder="Set constant flags, this will be appended in the beginning of the /q {message}, before the prefix",
-                                        required=False,
-                                        value= flags,
-                                        style=discord.InputTextStyle.long))
+    modal.add_item(
+        discord.ui.InputText(
+            label="Prefix",
+            placeholder="Set message prefix, this will be appended in the beginning of the /q {message}",
+            required=False,
+            value=handler_ctx.get_prefix(current_handler_key),
+            style=discord.InputTextStyle.long,
+        )
+    )
+    modal.add_item(
+        discord.ui.InputText(
+            label="Postfix",
+            placeholder="Set message postfix, this will be appended in the end of the /q {message}",
+            required=False,
+            value=handler_ctx.get_postfix(current_handler_key),
+            style=discord.InputTextStyle.long,
+        )
+    )
+    modal.add_item(
+        discord.ui.InputText(
+            label="Flags",
+            placeholder="Set constant flags, this will be appended in the beginning of the /q {message}, before the prefix",
+            required=False,
+            value=flags,
+            style=discord.InputTextStyle.long,
+        )
+    )
     await ctx.send_modal(modal)
 
 
@@ -319,25 +380,29 @@ async def checkpoints(ctx: discord.commands.context.ApplicationContext):
 async def queue_status(ctx):
     queue_data = ComfyClient().get_queue()
     ids = ""
-    for data in queue_data['queue_running']:
+    for data in queue_data["queue_running"]:
         ids = "{}\n{}".format(ids, data[1])
-    for data in queue_data['queue_pending']:
+    for data in queue_data["queue_pending"]:
         ids = "{}\n{}".format(ids, data[1])
     response = "{}\n{}".format(ComfyClient().get_prompt(), ids)
     await ctx.respond(response)
 
 
-@bot.slash_command(name="wake", description="Wake the ComfyUI host PC using Wake-on-LAN")
+@bot.slash_command(
+    name="wake", description="Wake the ComfyUI host PC using Wake-on-LAN"
+)
 async def wake(ctx):
-    mac = os.getenv('COMFY_UI_MAC')
-    host = os.getenv('COMFY_UI_HOST', '127.0.0.1:8188')
+    mac = os.getenv("COMFY_UI_MAC")
+    host = os.getenv("COMFY_UI_HOST", "127.0.0.1:8188")
 
     if not mac:
         await ctx.respond("❌ COMFY_UI_MAC environment variable is not set.")
         return
 
-    await ctx.respond(f"⏳ Sending wake packet to `{mac}`. Waiting for host `{host}` to respond (timeout: 60s)...")
-    
+    await ctx.respond(
+        f"⏳ Sending wake packet to `{mac}`. Waiting for host `{host}` to respond (timeout: 60s)..."
+    )
+
     try:
         send_magic_packet(mac)
         logger.info(f"Sent magic packet to {mac}")
@@ -355,9 +420,9 @@ async def wake(ctx):
     await ctx.respond(f"❌ Timed out waiting for host `{host}` to respond.")
 
 
-if __name__ == '__main__':
-    token = os.getenv('DISCORD_BOT_API_TOKEN')
-    os.environ['DISCORD_BOT_API_TOKEN'] = "TOKEN"
+if __name__ == "__main__":
+    token = os.getenv("DISCORD_BOT_API_TOKEN")
+    os.environ["DISCORD_BOT_API_TOKEN"] = "TOKEN"
     BotDB()
     ComfyHandlersManager()
     ComfyClient()
