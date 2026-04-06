@@ -222,8 +222,12 @@ async def handle_prompt_queue_result(queue_prompt_result: QueuePromptResult):
 @bot.slash_command(name="q", description="Submit a prompt to current workflow handler")
 async def q(ctx: discord.commands.context.ApplicationContext, message):
     await ctx.defer()
-    # Capture channel immediately for later use
-    channel = ctx.channel
+    # Capture channel immediately and get a fresh channel object not bound to the interaction
+    # This ensures channel.send() uses regular API calls, not interaction webhooks
+    channel = bot.get_channel(ctx.channel.id) if ctx.channel else None
+    if channel is None:
+        await ctx.respond("❌ Could not determine channel for response")
+        return
     # Send immediate followup to resolve "thinking" state
     await ctx.respond("⏳ Queuing generation...")
 
