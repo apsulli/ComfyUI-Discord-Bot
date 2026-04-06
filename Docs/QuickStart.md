@@ -8,11 +8,12 @@ Use the `/q` command followed by your prompt to start generating.
 
 ### ⚙️ Adding Arguments (Flags)
 You can customize your generation by adding flags directly to your message.
-*   `--res 1024:1024` : Change resolution (height:width)
+*   `--res 1024x1024` or `--res 1024:1024` : Change resolution (height:width or heightxwidth)
 *   `--steps 30` : Set sampling steps
 *   `--cfg 7.5` : Set CFG scale
 *   `--seed 123` : Set a specific seed
 *   `--ckpt <name>` : Use a specific model/checkpoint
+*   `--guidance N` : Set Flux guidance (Flux2Dev handler only)
 *   `!neg!` : Use this to separate positive and negative prompts.
     *Example:* `/q a majestic cat !neg! blurry, low quality`
 
@@ -23,6 +24,13 @@ Workflows (like Txt2Img, Flux, or Img2Img) are called **Handlers**.
 1. Use `/handlers` to see the list.
 2. Click the button for the workflow you want to use.
 3. Use `/handler-info` to see specific flags supported by your current selection.
+
+**Available handlers include:**
+*   **Txt2Img** - Standard SDXL text-to-image
+*   **Flux2Dev** - FLUX.1-dev with guidance scale support
+*   **CrystalClearXL** - SDXL with Crystal Clear XL model
+*   **Img2Img** - Image-to-image generation
+*   **FluxSchnell** - Fast FLUX.1-schnell workflow
 
 ---
 
