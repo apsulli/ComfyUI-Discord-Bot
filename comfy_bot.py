@@ -92,8 +92,15 @@ def process_message(message):
 # Event triggered when the bot is ready
 @bot.event
 async def on_ready():
-    global _main_event_loop
+    global _main_event_loop, prompt_result_queue
     _main_event_loop = asyncio.get_running_loop()
+
+    # Initialize queue now that event loop exists
+    prompt_result_queue = asyncio.Queue()
+
+    # Start the background task to process completed generations
+    asyncio.create_task(publish_images())
+
     if bot.auto_sync_commands:
         logger.info("Syncing commands with Discord (Guild: 1470592698238107821)...")
         await bot.sync_commands(guild_ids=[1470592698238107821])
@@ -139,9 +146,8 @@ async def on_message(message):
         await message.channel.send("Hi, use '/' commands")
 
 
-# Thread-safe queue for prompt results (replaces unsafe list)
-# Uses asyncio.Queue for safe cross-thread communication
-prompt_result_queue: asyncio.Queue = asyncio.Queue()
+# Thread-safe queue for prompt results (initialized in on_ready)
+prompt_result_queue: asyncio.Queue = None
 
 
 class PlayAudioView(discord.ui.View):
@@ -169,11 +175,12 @@ def handle_queue_prompt_result(ctx, p, prompt_handler, res: QueuePromptResult, c
     res.channel = channel
     res.prompt = p
     res.prompt_handler = prompt_handler
-    # Thread-safe: schedule put on the main event loop from worker thread
-    if _main_event_loop is not None:
-        _main_event_loop.call_soon_threadsafe(prompt_result_queue.put_nowait, res)
+    # Thread-safe: schedule coroutine on the main event loop from worker thread
+    # Per Discord.py docs: use run_coroutine_threadsafe for cross-thread operations
+    if _main_event_loop is not None and prompt_result_queue is not None:
+        asyncio.run_coroutine_threadsafe(prompt_result_queue.put(res), _main_event_loop)
     else:
-        logger.error("Main event loop not initialized - cannot queue result")
+        logger.error("Event loop or queue not initialized - cannot queue result")
 
 
 async def publish_images():
@@ -181,10 +188,10 @@ async def publish_images():
     while True:
         # Block until a result is available (thread-safe)
         queue_prompt_result = await prompt_result_queue.get()
-        await handle_prompt_queue_result(queue_prompt_result)
-
-
-bot.loop.create_task(publish_images())
+        try:
+            await handle_prompt_queue_result(queue_prompt_result)
+        finally:
+            prompt_result_queue.task_done()
 
 
 async def handle_prompt_queue_result(queue_prompt_result: QueuePromptResult):
@@ -439,8 +446,9 @@ async def wake(ctx):
         await ctx.respond(f"❌ Failed to send magic packet: {e}")
         return
 
-    start_time = asyncio.get_event_loop().time()
-    while asyncio.get_event_loop().time() - start_time < 60:
+    loop = asyncio.get_running_loop()
+    start_time = loop.time()
+    while loop.time() - start_time < 60:
         if await ping_host(host):
             await ctx.respond(f"✅ Host `{host}` is now online!")
             return
