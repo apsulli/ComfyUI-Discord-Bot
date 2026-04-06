@@ -30,7 +30,11 @@ _main_event_loop = None
 
 
 def handle_sigterm(*args):
-    logger.info("SIGTERM received, exiting...")
+    logger.info("SIGTERM received, shutting down...")
+    try:
+        ComfyClient().shutdown()
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
     sys.exit(0)
 
 

@@ -272,3 +272,19 @@ class ComfyClient(object):
                     output_images[current_node] = images_output
 
         return output_images
+
+    def shutdown(self):
+        """Clean shutdown of WebSocket connection and thread pool."""
+        self._logger.info("Shutting down ComfyClient...")
+        if self._websocket:
+            try:
+                self._websocket.close()
+                self._logger.info("WebSocket connection closed")
+            except Exception as e:
+                self._logger.error(f"Error closing WebSocket: {e}")
+        if self._executor:
+            try:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+                self._logger.info("Thread pool executor shut down")
+            except Exception as e:
+                self._logger.error(f"Error shutting down executor: {e}")
