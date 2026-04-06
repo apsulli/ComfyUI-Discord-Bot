@@ -134,7 +134,9 @@ async def on_message(message):
         await message.channel.send("Hi, use '/' commands")
 
 
-queue_prompt_results: QueuePromptResult = []
+# Thread-safe queue for prompt results (replaces unsafe list)
+# Uses asyncio.Queue for safe cross-thread communication
+prompt_result_queue: asyncio.Queue = asyncio.Queue()
 
 
 class PlayAudioView(discord.ui.View):
@@ -157,38 +159,46 @@ class PlayAudioView(discord.ui.View):
 
 
 def handle_queue_prompt_result(ctx, p, prompt_handler, res: QueuePromptResult, channel):
+    """Called from WebSocket thread - safely queue result to async loop."""
     res.ctx = ctx
     res.channel = channel
     res.prompt = p
     res.prompt_handler = prompt_handler
-    queue_prompt_results.append(res)
+    # Thread-safe: schedule put on the event loop from worker thread
+    asyncio.get_event_loop().call_soon_threadsafe(prompt_result_queue.put_nowait, res)
 
 
 async def publish_images():
+    """Background task to process completed generations from queue."""
     while True:
-        await asyncio.sleep(1)
-        if len(queue_prompt_results) > 0:
-            await handle_prompt_queue_result(queue_prompt_results.pop(0))
+        # Block until a result is available (thread-safe)
+        queue_prompt_result = await prompt_result_queue.get()
+        await handle_prompt_queue_result(queue_prompt_result)
 
 
 bot.loop.create_task(publish_images())
 
 
 async def handle_prompt_queue_result(queue_prompt_result: QueuePromptResult):
-    # TODO add error handling
+    """Send completed generation results to the originating channel."""
     prompt_id = queue_prompt_result.prompt_id
     logger.debug(f"handling prompt result, id:[{prompt_id}]")
+
     channel = queue_prompt_result.channel
+    if channel is None:
+        logger.error(f"Cannot deliver results for prompt {prompt_id}: channel is None")
+        return
+
     images = queue_prompt_result.images
     prompt_handler = queue_prompt_result.prompt_handler
+
     try:
-        # TODO handle describe more then 2000 char...
-        await channel.send(
-            "Completed prompt: {}\n{}".format(
-                prompt_id, prompt_handler.describe(queue_prompt_result.prompt)
-            )
-        )
-        logger.debug(f"handling prompt result, send prompt summary, id:[{prompt_id}]")
+        # Send completion summary
+        description = prompt_handler.describe(queue_prompt_result.prompt)
+        await channel.send(f"Completed prompt: {prompt_id}\n{description}")
+        logger.debug(f"handling prompt result, sent prompt summary, id:[{prompt_id}]")
+
+        # Send generated images
         for node_id, image_list in images.items():
             imgs = [
                 File(filename=str(uuid.uuid4()) + ".png", fp=io.BytesIO(image_data))
@@ -196,10 +206,17 @@ async def handle_prompt_queue_result(queue_prompt_result: QueuePromptResult):
             ]
             await channel.send("", files=imgs)
             logger.debug(f"handling prompt result, sent images, id:[{prompt_id}]")
+
+    except discord.NotFound:
+        logger.error(f"Channel not found for prompt {prompt_id}")
+    except discord.Forbidden:
+        logger.error(f"No permission to send to channel for prompt {prompt_id}")
     except Exception as e:
-        logger.error(f"failed to send results due to: {e}")
-        if channel:
-            await channel.send("error while processing images")
+        logger.exception(f"Failed to send results for prompt {prompt_id}: {e}")
+        try:
+            await channel.send("❌ Error while processing images")
+        except Exception:
+            pass  # Channel may be inaccessible
 
 
 @bot.slash_command(name="q", description="Submit a prompt to current workflow handler")

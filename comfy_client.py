@@ -50,16 +50,19 @@ class ComfyClient(object):
         self._websocket = None
         self._client_id = str(uuid.uuid4())
 
-        # Start the websocket thread as a daemon so it doesn't block shutdown
+        # Thread-safe locks for shared state between WebSocket thread and main thread
         import threading
 
+        self._lock = threading.Lock()
+        self._callbacks = []
+        self._prompt_ids = []
+
+        # Start the websocket thread as a daemon so it doesn't block shutdown
         self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ComfyWS")
         # We can't easily make ThreadPoolExecutor threads daemons in all versions,
         # but we can close the websocket on shutdown.
 
         self._executor.submit(self._connect_websocket)
-        self._callbacks = []
-        self._prompt_ids = []
         self._logger.info(
             "comfy client created with client id [{}] and comfy server at [{}].".format(
                 self._client_id, self._comfy_url
@@ -105,30 +108,43 @@ class ComfyClient(object):
                         message = json.loads(out)
                         if message["type"] == "executing":
                             data = message["data"]
-                            if (
-                                len(self._prompt_ids) > 0
-                                and data["prompt_id"] == self._prompt_ids[0]
-                            ):
-                                if data["node"] is None:
-                                    self._logger.info(
-                                        f"Prompt {self._prompt_ids[0]} execution completed."
-                                    )
-                                    self._callbacks[0](
+                            with self._lock:
+                                if (
+                                    len(self._prompt_ids) > 0
+                                    and data["prompt_id"] == self._prompt_ids[0]
+                                ):
+                                    if data["node"] is None:
+                                        prompt_id = self._prompt_ids[0]
+                                        callback = self._callbacks[0]
+                                        self._prompt_ids.pop(0)
+                                        self._callbacks.pop(0)
+                                    else:
+                                        current_node = data["node"]
+                                        self._logger.debug(
+                                            f"Executing node: {current_node}"
+                                        )
+                                        continue  # Skip to next iteration while holding lock
+                                else:
+                                    continue  # Skip to next iteration
+                            # Release lock before calling callback (may be slow)
+                            if data["node"] is None:
+                                self._logger.info(
+                                    f"Prompt {prompt_id} execution completed."
+                                )
+                                try:
+                                    callback(
                                         QueuePromptResult(
-                                            prompt_id=self._prompt_ids[0],
+                                            prompt_id=prompt_id,
                                             images=output_images,
                                             status=True,
                                         )
                                     )
-                                    self._prompt_ids = self._prompt_ids[1:]
-                                    self._callbacks = self._callbacks[1:]
-                                    output_images = {}
-                                    current_node = ""
-                                else:
-                                    current_node = data["node"]
-                                    self._logger.debug(
-                                        f"Executing node: {current_node}"
+                                except Exception as e:
+                                    self._logger.error(
+                                        f"Callback failed for prompt {prompt_id}: {e}"
                                     )
+                                output_images = {}
+                                current_node = ""
                     else:
                         if current_node == "save_image_websocket_node":
                             images_output = output_images.get(current_node, [])
@@ -148,11 +164,13 @@ class ComfyClient(object):
         url = "{}://{}/prompt".format(self._protocol, self._comfy_url)
         try:
             req = urllib.request.Request(url, data=data)
-            self._callbacks.append(callback)
             with urllib.request.urlopen(req) as response:
                 res = json.loads(response.read())
                 prompt_id = res["prompt_id"]
-                self._prompt_ids.append(prompt_id)
+                # Add callback and prompt_id atomically under lock
+                with self._lock:
+                    self._callbacks.append(callback)
+                    self._prompt_ids.append(prompt_id)
                 self._logger.info(f"Prompt queued successfully. ID: {prompt_id}")
                 return prompt_id
         except urllib.error.HTTPError as e:
