@@ -25,6 +25,9 @@ bot = commands.Bot(intents=intents, command_prefix="/")
 bot.auto_sync_commands = True
 logger = get_logger("ComfyBOT")
 
+# Store reference to main event loop for cross-thread communication
+_main_event_loop = None
+
 
 def handle_sigterm(*args):
     logger.info("SIGTERM received, exiting...")
@@ -89,6 +92,8 @@ def process_message(message):
 # Event triggered when the bot is ready
 @bot.event
 async def on_ready():
+    global _main_event_loop
+    _main_event_loop = asyncio.get_running_loop()
     if bot.auto_sync_commands:
         logger.info("Syncing commands with Discord (Guild: 1470592698238107821)...")
         await bot.sync_commands(guild_ids=[1470592698238107821])
@@ -164,8 +169,11 @@ def handle_queue_prompt_result(ctx, p, prompt_handler, res: QueuePromptResult, c
     res.channel = channel
     res.prompt = p
     res.prompt_handler = prompt_handler
-    # Thread-safe: schedule put on the event loop from worker thread
-    asyncio.get_event_loop().call_soon_threadsafe(prompt_result_queue.put_nowait, res)
+    # Thread-safe: schedule put on the main event loop from worker thread
+    if _main_event_loop is not None:
+        _main_event_loop.call_soon_threadsafe(prompt_result_queue.put_nowait, res)
+    else:
+        logger.error("Main event loop not initialized - cannot queue result")
 
 
 async def publish_images():
