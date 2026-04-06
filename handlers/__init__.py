@@ -7,6 +7,7 @@ from .handlers import (
     FluxSchnellHandler,
     LoraControlNetHandler,
     Flux2DevHandler,
+    CrystalClearXLHandler,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "FluxSchnellHandler",
     "LoraControlNetHandler",
     "Flux2DevHandler",
+    "CrystalClearXLHandler",
 ]

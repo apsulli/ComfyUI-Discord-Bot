@@ -12,6 +12,7 @@ from handlers.prompts import (
     FLUX_SCHNELL,
     FLUX2_DEV,
     LORA_CONTROLNET_PROMPT,
+    CRYSTAL_CLEAR_XL,
 )
 
 
@@ -1671,4 +1672,144 @@ batch: {batch}
 --batch {batch}
 --steps {steps}
 --guidance {guidance}
+"""
+
+
+class CrystalClearXLHandler:
+    _neg_token = "!neg!"
+
+    def __init__(self):
+        self.workflow_as_text = CRYSTAL_CLEAR_XL
+        self._flags_handler = FlagsHandler(r"--(\w+)\s+([^\s]+)")
+        self._flags_handler.set_flags(
+            "res",
+            [["4", "inputs", "height"], ["4", "inputs", "width"]],
+            convert_func=res_spliter,
+        )
+        self._flags_handler.set_flags("batch", [["4", "inputs", "batch_size"]])
+        self._flags_handler.set_flags("steps", [["5", "inputs", "steps"]])
+        self._flags_handler.set_flags("seed", [["5", "inputs", "seed"]])
+        self._flags_handler.set_flags("cfg", [["5", "inputs", "cfg"]])
+        self._flags_handler.set_flags("ckpt", [["1", "inputs", "ckpt_name"]])
+        self._flags_handler.set_flags("sampler", [["5", "inputs", "sampler_name"]])
+        self._flags_handler.set_flags("schd", [["5", "inputs", "scheduler"]])
+        self._flags_handler.set_flags("filesave", [["7", "inputs", "filename_prefix"]])
+        self._flags_handler.set_flags("positive-prompt", [["2", "inputs", "text"]])
+        self._flags_handler.set_flags("negative-prompt", [["3", "inputs", "text"]])
+
+    def handle(self, message):
+        prompt = json.loads(self.workflow_as_text)
+
+        flags = self._flags_handler.extract_flags(message)
+
+        positive_prompt = self._flags_handler.clean_from_flags(message)
+
+        parts = positive_prompt.split(self._neg_token, maxsplit=1)
+
+        today = datetime.date.today()
+        formatted_date = today.strftime("%Y-%m-%d")
+        self._flags_handler.manipulate_prompt(
+            "filesave",
+            "{}/{}".format(formatted_date, "comfy-bot-crystal-clear-xl-"),
+            prompt,
+        )
+
+        self._flags_handler.manipulate_prompt("positive-prompt", parts[0], prompt)
+
+        if len(parts) > 1:
+            self._flags_handler.manipulate_prompt("negative-prompt", parts[1], prompt)
+
+        self._flags_handler.manipulate_prompt(
+            "seed", str(random.randint(1, 2**64)), prompt
+        )
+
+        for flagTuple in flags:
+            self._flags_handler.manipulate_prompt(flagTuple[0], flagTuple[1], prompt)
+            pass
+
+        return prompt
+
+    def describe(self, prompt):
+        seed = str(self._flags_handler.get_value("seed", prompt))
+        steps = str(self._flags_handler.get_value("steps", prompt))
+        cfg = str(self._flags_handler.get_value("cfg", prompt))
+        checkpoint = self._flags_handler.get_value("ckpt", prompt)
+        batch = str(self._flags_handler.get_value("batch", prompt))
+        res = ":".join(
+            [str(num) for num in self._flags_handler.get_values("res", prompt)]
+        )
+        sampler = self._flags_handler.get_value("sampler", prompt)
+        scheduler = self._flags_handler.get_value("schd", prompt)
+
+        description = f"""
+checkpoint: {checkpoint}
+seed: {seed}
+resolution: {res}
+steps: {steps}
+cfg: {cfg}
+batch: {batch}
+sampler: {sampler}
+scheduler: {scheduler}
+"""
+        return description
+
+    def info(self):
+        prompt = json.loads(self.workflow_as_text)
+        steps = str(self._flags_handler.get_value("steps", prompt))
+        cfg = str(self._flags_handler.get_value("cfg", prompt))
+        checkpoint = self._flags_handler.get_value("ckpt", prompt)
+        batch = str(self._flags_handler.get_value("batch", prompt))
+        res = ":".join(
+            [str(num) for num in self._flags_handler.get_values("res", prompt)]
+        )
+        sampler = self._flags_handler.get_value("sampler", prompt)
+        scheduler = self._flags_handler.get_value("schd", prompt)
+        return f"""
+# Handler: {self.key()}
+
+## Supported flags:
+
+**--res**: `height:width`, `{res}` default.
+
+**--cfg**: the CFG value, `{cfg}` default.
+
+**--steps**: # of steps, `{steps}` default.
+
+**--seed**: seed value, `random` default.
+
+**--batch**: the batch size, `{batch}` default.
+
+**--ckpt**: the checkpoint to use, `{checkpoint}` default.
+
+**--schd**: the scheduler to use, `{scheduler}` default.
+
+**--sampler**: the sampler to use, `{sampler}` default.
+
+## Special tokens:
+
+`{self._neg_token}` - will split the message into positive/negative prompts.
+"""
+
+    def key(self):
+        return "CrystalClearXL"
+
+    def default_flags(self):
+        prompt = json.loads(self.workflow_as_text)
+        steps = str(self._flags_handler.get_value("steps", prompt))
+        cfg = str(self._flags_handler.get_value("cfg", prompt))
+        checkpoint = self._flags_handler.get_value("ckpt", prompt)
+        batch = str(self._flags_handler.get_value("batch", prompt))
+        res = ":".join(
+            [str(num) for num in self._flags_handler.get_values("res", prompt)]
+        )
+        sampler = self._flags_handler.get_value("sampler", prompt)
+        scheduler = self._flags_handler.get_value("schd", prompt)
+        return f"""
+--res {res}
+--cfg {cfg}
+--steps {steps}
+--batch {batch}
+--ckpt {checkpoint}
+--schd {scheduler}
+--sampler {sampler}
 """
