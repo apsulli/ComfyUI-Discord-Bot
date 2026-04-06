@@ -1,0 +1,251 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "FLUX1\\flux1-dev-fp8.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "2": {
+    "inputs": {
+      "clip_name1": "t5xxl_fp8_e4m3fn.safetensors",
+      "clip_name2": "clip_l.safetensors",
+      "type": "flux",
+      "device": "default"
+    },
+    "class_type": "DualCLIPLoader",
+    "_meta": {
+      "title": "DualCLIPLoader"
+    }
+  },
+  "3": {
+    "inputs": {
+      "vae_name": "flux_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "5": {
+    "inputs": {
+      "text": "solid pure white background, decorative border frame made of jungle foliage, large empty white center, vines and leaves only along left edge right edge and bottom edge, deep emerald green and amethyst purple color palette, dramatic warm-to-cool color shifts across each leaf and vine, thick twisted jungle vines and creeping roots, dense tropical leaf clusters with individual leaf detail, large curved thorny branches, gouache painting with thick opaque brushstrokes, traditional animation background painting, oil paint texture, warm golden highlights and cool blue-green shadows, strong directional rim lighting, lush detailed foliage, layered overlapping depth, vignette frame composition, side-scroller, 2d platformer, flat background, orthogonal view",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "6": {
+    "inputs": {
+      "guidance": 3.5,
+      "conditioning": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FluxGuidance"
+    }
+  },
+  "11": {
+    "inputs": {
+      "width": 1216,
+      "height": 320,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "12": {
+    "inputs": {
+      "seed": 27276865649135,
+      "steps": 20,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "1",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "43",
+        0
+      ],
+      "latent_image": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "13": {
+    "inputs": {
+      "samples": [
+        "12",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "24": {
+    "inputs": {
+      "model": "BEN2",
+      "sensitivity": 0.6,
+      "process_res": 1024,
+      "mask_blur": 0,
+      "mask_offset": -3,
+      "invert_output": false,
+      "refine_foreground": true,
+      "background": "Alpha",
+      "background_color": "#ffffff",
+      "image": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "RMBG",
+    "_meta": {
+      "title": "Remove Background (RMBG)"
+    }
+  },
+  "25": {
+    "inputs": {
+      "filename_prefix": "original",
+      "images": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "29": {
+    "inputs": {
+      "server_url": "http://alexs-macbook-pro.tailf7db2.ts.net:9090/upload",
+      "category": "environment",
+      "asset_name": "act1_parallax_near",
+      "original_image": [
+        "13",
+        0
+      ],
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "43",
+        0
+      ],
+      "rmbg_image": [
+        "24",
+        0
+      ],
+      "alpha_image": [
+        "31",
+        0
+      ]
+    },
+    "class_type": "PostImageToProject",
+    "_meta": {
+      "title": "Ritzy Project Capture"
+    }
+  },
+  "30": {
+    "inputs": {
+      "invert": false,
+      "threshold": 200,
+      "mask_color": "#ffffff",
+      "images": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "AILab_ColorToMask",
+    "_meta": {
+      "title": "Color to Mask (RMBG) 🎭"
+    }
+  },
+  "31": {
+    "inputs": {
+      "image": [
+        "13",
+        0
+      ],
+      "alpha": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "JoinImageWithAlpha",
+    "_meta": {
+      "title": "Join Image with Alpha"
+    }
+  },
+  "32": {
+    "inputs": {
+      "filename_prefix": "colortomask",
+      "images": [
+        "31",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "35": {
+    "inputs": {
+      "filename_prefix": "rmbg",
+      "images": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "43": {
+    "inputs": {
+      "text": "black background, dark background, night, nighttime, sky, landscape, ground, terrain, horizon, outdoor scene, monochrome, grayscale, desaturated, brown, sepia, flat color, flat shading, cel shading, vector art, clip art, coloring book, uniform line weight, SVG, simple shapes, digital art, CG, smooth plastic, uniform color, single shade of green, watercolor, wash, smoke, mist, fog, translucent, transparent, ghostly, glow, bloom, splatter, dripping ink, muddy texture, soft edges, blurry, photorealistic, 3d render, smooth gradients, character, floor, wall, text, pumpkin, fruit, flower cluster, dead tree, single tree, vanishing point, depth, perspective, 3d, isometric, fisheye",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  }
+}

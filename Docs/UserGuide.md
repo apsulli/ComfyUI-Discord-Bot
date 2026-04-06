@@ -103,3 +103,58 @@ View all the checkpoints currently set in comfy server.
 ## Uploading Images
 
 Uploading any images to the bot will result in corresponding ordered url links for the image. this urls can be used for workloads that can load image via url.
+
+---
+
+## Handlers Reference
+
+The following handlers are available for different generation workflows:
+
+### Flux2Dev
+
+A FLUX.1-dev based workflow using UNETLoader with fp8 precision.
+
+**Supported flags:**
+- `--res height:width` - Resolution (default: 1024:1024)
+- `--steps N` - Sampling steps (default: 20)
+- `--seed N` - Random seed (default: random)
+- `--guidance N` - Flux guidance scale (default: 3.5)
+- `--batch N` - Batch size (default: 1)
+- `--unet <filename>` - Diffusion model filename (from models/unet/)
+- `--negative-prompt <text>` - Negative conditioning text
+
+**Example:**
+```
+/q a beautiful landscape --res 1920x1080 --steps 25 --guidance 4
+```
+
+### CrystalClearXL
+
+An SDXL-based workflow using the Crystal Clear XL checkpoint.
+
+**Supported flags:**
+- `--res height:width` - Resolution (default: 1024:1024, supports both `:` and `x` separators)
+- `--cfg N` - CFG scale (default: 7)
+- `--steps N` - Sampling steps (default: 30)
+- `--seed N` - Random seed (default: random)
+- `--batch N` - Batch size (default: 1)
+- `--ckpt <name>` - Checkpoint to use (default: crystalClearXL_ccxl.safetensors)
+- `--schd <name>` - Scheduler (default: karras)
+- `--sampler <name>` - Sampler (default: dpmpp_2m)
+
+**Special tokens:**
+- `!neg!` - Splits message into positive/negative prompts
+
+**Example:**
+```
+/q portrait of a wizard !neg! blurry, low quality --res 1024x1024 --cfg 7
+```
+
+### Other Handlers
+
+Use `/handler-info` to see specific flags for other handlers like:
+- **Txt2Img** - Standard SDXL text-to-image
+- **Img2Img** - Image-to-image generation
+- **FluxSchnell** - Fast FLUX.1-schnell workflow
+- **InstantIDFace** - Face swapping with InstantID
+- **IPAdapterStyle** - Style transfer with IP-Adapter
