@@ -25,6 +25,9 @@ def rev_identity(x):
 
 
 def res_spliter(x):
+    # Handle both "1920:1080" and "1920x1080" formats
+    if "x" in x:
+        return x.split("x")
     return x.split(":")
 
 
