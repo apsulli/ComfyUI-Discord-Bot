@@ -5,6 +5,8 @@
 Use the `/q` command followed by your prompt to start generating.
 **Example:** `/q a majestic cat in space`
 
+The bot will respond with "⏳ Queuing generation..." immediately, then deliver your images to the channel when ready (this may take several minutes depending on complexity).
+
 ---
 
 ### ⚙️ Adding Arguments (Flags)

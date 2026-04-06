@@ -8,7 +8,9 @@ Just type '/' and you should be able to see the list of all commands under you B
 
 ### /q {message}
 
-Queue a workflow of the current handler with a given message. The message should contain all the required information and syntax for the current handler. 
+Queue a workflow of the current handler with a given message. The message should contain all the required information and syntax for the current handler.
+
+**Note:** The bot will immediately respond with "⏳ Queuing generation..." and then deliver the completed images directly to the channel (not as an interaction followup). This ensures images are always delivered to the originating channel, even if generation takes longer than 15 minutes.
 
 To make efficient prompting without the need to deal with long repeating prompts check the [handler-context](#handler-context) command to set prefix or postfix and [refs](#ref-set-ref-value) features.
 
@@ -158,3 +160,26 @@ Use `/handler-info` to see specific flags for other handlers like:
 - **FluxSchnell** - Fast FLUX.1-schnell workflow
 - **InstantIDFace** - Face swapping with InstantID
 - **IPAdapterStyle** - Style transfer with IP-Adapter
+
+---
+
+## Technical Notes
+
+### Image Delivery Architecture
+
+The bot uses an asynchronous architecture to handle long-running image generations:
+
+1. **Immediate Acknowledgment**: When you submit a `/q` command, the bot immediately responds with "⏳ Queuing generation..." to resolve the Discord interaction
+2. **Background Processing**: The prompt is queued to ComfyUI and processed in a background WebSocket thread
+3. **Channel-Based Delivery**: When images are ready, they are sent directly to the originating channel using the bot's API (not interaction webhooks)
+
+This approach ensures images are always delivered to the correct channel, even if generation takes longer than Discord's 15-minute interaction timeout window.
+
+### Thread Safety
+
+The bot maintains thread-safe communication between:
+- The main async event loop (handling Discord interactions)
+- The WebSocket thread (communicating with ComfyUI)
+- The background task (processing completed generations)
+
+All cross-thread operations use proper synchronization primitives to prevent race conditions and ensure reliable message delivery.
